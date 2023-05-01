@@ -1,15 +1,19 @@
 #include <SDL2/SDL.h>
 #include <iostream>
+#include <vector>
+#include <algorithm>
+#include <math.h>
 
 using namespace std;
 
-const int SCREEN_WIDTH = 2*480;
+const int SCREEN_WIDTH = 2*480; // Two canvas, sid
 const int SCREEN_HEIGHT = 480;
-const int CELL_SIZE = 24; // Which yields a 20x20 "pixel" image, like the first perceptron
+const int CELL_SIZE = 24; // Which yields a 20x20 "pixel" image, like the first
 const int PERCEPTRON_SCREEN_WIDTH = 480;
 const int PERCEPTRON_SCREEN_HEIGHT = 480;
 const int ROWS = PERCEPTRON_SCREEN_HEIGHT / CELL_SIZE;
 const int COLUMNS = PERCEPTRON_SCREEN_WIDTH / CELL_SIZE;
+const int IMAGE_SIZE = SCREEN_HEIGHT / CELL_SIZE;
 
 SDL_Window* gWindow = nullptr;
 SDL_Renderer* gRenderer = nullptr;
@@ -40,6 +44,57 @@ bool init()
     return true;
 }
 
+bool drawSquare(int r, int c, int w, int h){
+
+    if(r > 20 || r < 0 || r+h > 20 || r+h < 0 || c > 20 || c < 0 || c+w > 20 || c+w < 0){
+        return -1;
+    }
+    SDL_SetRenderDrawColor(gRenderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+    for(int row=r; row < r + h; row++){
+        for(int col=c; col < c + w; col++){
+            SDL_Rect cellRect = { col * CELL_SIZE + 480, row * CELL_SIZE, w*CELL_SIZE, h*CELL_SIZE };
+            SDL_RenderFillRect(gRenderer, &cellRect);
+        }
+    }
+    return 0;
+}
+
+bool inside_circle(int center_x, int center_y, int radius, int tile_x, int tile_y){
+    float dx = center_x - tile_x;
+    float dy = center_y - tile_y;
+    float distance = sqrt(dx*dx + dy*dy);
+    return distance <= radius;
+}
+
+bool drawCircle(int center_x, int center_y, int radius){
+
+    if(center_x > 20 || center_x < 0 || center_x+radius > 20 || center_x - radius < 0){
+        return -1;
+    }
+    SDL_SetRenderDrawColor(gRenderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+    
+    for(int row=0; row<IMAGE_SIZE; row++){
+        for(int col=0; col<IMAGE_SIZE; col++){
+            if(inside_circle(center_x, center_y, radius, col, row)){
+                SDL_Rect cellRect = { col * CELL_SIZE + 480, row * CELL_SIZE, CELL_SIZE, CELL_SIZE };
+                SDL_RenderFillRect(gRenderer, &cellRect);
+            }
+        }
+    }
+    return 0;
+}
+
+// Used by figures
+double rand_range(int lower=0, int upper=0){
+    double r = ((double) rand() / (RAND_MAX));
+
+    return r * (upper - lower) + lower;
+}
+
+// used by perceptron
+double rand_init(){
+    return ((double) rand() / (RAND_MAX));
+}
 
 int main(int argc, char* argv[]) {
     
@@ -50,31 +105,54 @@ int main(int argc, char* argv[]) {
     }
 
     srand((unsigned int)time(NULL)); // set random seed
-    // Clear Canvas
-    SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(gRenderer);
-
-    SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
-    // Draw the grid of cells
-    for (int row = 0; row < ROWS; ++row) {
-        for (int col = 0; col < COLUMNS; ++col) {
-            int weight = (int) (rand() * 255);
-            SDL_SetRenderDrawColor(gRenderer, weight, 128, 255, SDL_ALPHA_OPAQUE);
-            SDL_Rect cellRect = { col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE };
-            SDL_RenderFillRect(gRenderer, &cellRect);
-        }
-    }
-
-    SDL_RenderPresent(gRenderer);
-
+    
+    Uint64 lastElapsed = SDL_GetTicks64();
     SDL_Event event;
     bool quit = false;
+
+    // Perceptron Initialization  weights
+    vector<double> weights(IMAGE_SIZE*IMAGE_SIZE);
+    generate(weights.begin(), weights.end(), rand_init);
+    
+
     while (!quit) {
         if (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
                 quit = true;
             }
         }
+
+        Uint64 elapsed = SDL_GetTicks64();
+        if(elapsed - lastElapsed >= 500){
+            lastElapsed = elapsed;
+            // Clear Canvas
+            SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+            SDL_RenderClear(gRenderer);
+
+            // Draw Perceptron Weights
+            int i = 0;
+            for (int row = 0; row < ROWS; ++row) {
+                for (int col = 0; col < COLUMNS; col++, i++) {
+                    int weight = (int) (weights[i] * 255);
+                    SDL_SetRenderDrawColor(gRenderer, weight, 128, 255, SDL_ALPHA_OPAQUE);
+                    SDL_Rect cellRect = { col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE };
+                    SDL_RenderFillRect(gRenderer, &cellRect);   
+                }
+            }
+            // Draw Image to be classified
+            int error = 0;
+            int y_target = 0;
+            if((double) rand() / (RAND_MAX) > 0.5){
+                error = drawCircle(rand_range(3, 16), rand_range(3, 16), rand_range(3, 6));
+                y_target = 1;
+            }
+            else {
+                error = drawSquare(rand_range(2, 17), rand_range(2, 17), rand_range(2, 6), rand_range(2, 6));
+                y_target = 0;
+            }
+        }
+
+        SDL_RenderPresent(gRenderer);
     }
 
     SDL_DestroyRenderer(gRenderer);
