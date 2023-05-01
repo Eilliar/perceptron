@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
         }
 
         Uint64 elapsed = SDL_GetTicks64();
-        if(elapsed - lastElapsed >= 500){
+        if(elapsed - lastElapsed >= 10){
             lastElapsed = elapsed;
             // Clear Canvas
             SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
