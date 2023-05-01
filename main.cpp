@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <numeric>
 #include <math.h>
 
 using namespace std;
@@ -17,6 +18,7 @@ const int IMAGE_SIZE = SCREEN_HEIGHT / CELL_SIZE;
 
 SDL_Window* gWindow = nullptr;
 SDL_Renderer* gRenderer = nullptr;
+vector<double> vImage(IMAGE_SIZE*IMAGE_SIZE, 0.0);
 
 bool init()
 {
@@ -50,10 +52,14 @@ bool drawSquare(int r, int c, int w, int h){
         return -1;
     }
     SDL_SetRenderDrawColor(gRenderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+
+    int i = 0;
+    fill(vImage.begin(), vImage.end(), 0);
     for(int row=r; row < r + h; row++){
-        for(int col=c; col < c + w; col++){
+        for(int col=c; col < c + w; col++, i++){
             SDL_Rect cellRect = { col * CELL_SIZE + 480, row * CELL_SIZE, w*CELL_SIZE, h*CELL_SIZE };
             SDL_RenderFillRect(gRenderer, &cellRect);
+            vImage[IMAGE_SIZE * row + col] = 1;
         }
     }
     return 0;
@@ -73,11 +79,14 @@ bool drawCircle(int center_x, int center_y, int radius){
     }
     SDL_SetRenderDrawColor(gRenderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
     
+    int i = 0;
+    fill(vImage.begin(), vImage.end(), 0);
     for(int row=0; row<IMAGE_SIZE; row++){
-        for(int col=0; col<IMAGE_SIZE; col++){
+        for(int col=0; col<IMAGE_SIZE; col++, i++){
             if(inside_circle(center_x, center_y, radius, col, row)){
                 SDL_Rect cellRect = { col * CELL_SIZE + 480, row * CELL_SIZE, CELL_SIZE, CELL_SIZE };
                 SDL_RenderFillRect(gRenderer, &cellRect);
+                vImage[i] = 1;
             }
         }
     }
@@ -113,7 +122,6 @@ int main(int argc, char* argv[]) {
     // Perceptron Initialization  weights
     vector<double> weights(IMAGE_SIZE*IMAGE_SIZE);
     generate(weights.begin(), weights.end(), rand_init);
-    
 
     while (!quit) {
         if (SDL_PollEvent(&event)) {
@@ -131,9 +139,12 @@ int main(int argc, char* argv[]) {
 
             // Draw Perceptron Weights
             int i = 0;
+            double max_w = *max_element(weights.begin(), weights.end());
+            double min_w = *min_element(weights.begin(), weights.end());
             for (int row = 0; row < ROWS; ++row) {
                 for (int col = 0; col < COLUMNS; col++, i++) {
-                    int weight = (int) (weights[i] * 255);
+                    // int weight = (int) (weights[i] * 255);        
+                    int weight = (int)  (255 * (weights[i] - min_w) / (max_w - min_w));
                     SDL_SetRenderDrawColor(gRenderer, weight, 128, 255, SDL_ALPHA_OPAQUE);
                     SDL_Rect cellRect = { col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE };
                     SDL_RenderFillRect(gRenderer, &cellRect);   
@@ -143,12 +154,31 @@ int main(int argc, char* argv[]) {
             int error = 0;
             int y_target = 0;
             if((double) rand() / (RAND_MAX) > 0.5){
+                // P
                 error = drawCircle(rand_range(3, 16), rand_range(3, 16), rand_range(3, 6));
                 y_target = 1;
             }
             else {
+                // N
                 error = drawSquare(rand_range(2, 17), rand_range(2, 17), rand_range(2, 6), rand_range(2, 6));
                 y_target = 0;
+            }
+
+            if(error == 0) {
+                double predict = 0;
+                for(int i = 0; i < IMAGE_SIZE*IMAGE_SIZE; i++){
+                    predict += weights[i] * vImage[i];
+                }
+                cout << "Dot Product : " << predict << "\tTarget: " << y_target;
+                if(predict > 0) cout << "\tPrediction: 1" << endl;
+                else cout << "\t Prediction: 0" << endl;
+                // Update weights
+                if(y_target == 1 && predict < 0){
+                    transform(weights.begin(), weights.end(), vImage.begin(), weights.begin(), plus<double>( ));
+                }
+                if(y_target == 0 && predict >= 0){
+                    transform(weights.begin(), weights.end(), vImage.begin(), weights.begin(), minus<double>( ));
+                }
             }
         }
 
