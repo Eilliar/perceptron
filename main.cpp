@@ -7,7 +7,7 @@
 
 using namespace std;
 
-const int SCREEN_WIDTH = 2*480; // Two canvas, sid
+const int SCREEN_WIDTH = 2*480; // Two canvas, side by side
 const int SCREEN_HEIGHT = 480;
 const int CELL_SIZE = 24; // Which yields a 20x20 "pixel" image, like the first
 const int PERCEPTRON_SCREEN_WIDTH = 480;
